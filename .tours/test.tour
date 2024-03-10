@@ -1,0 +1,11 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "test",
+  "steps": [
+    {
+      "file": "src/main.rs",
+      "description": "aerae\n",
+      "line": 21
+    }
+  ]
+}
