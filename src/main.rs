@@ -5,18 +5,17 @@
 #![no_main]
 
 use bsp::entry;
+use bsp::hal::multicore::{Multicore, Stack};
 use core::fmt::Write;
 use defmt::*;
 use defmt_rtt as _;
 use embedded_hal::digital::v2::OutputPin;
+// use embedded_hal::digital::StatefulOutputPin;
 use heapless::String;
 use panic_probe as _;
+use rp_pico as bsp;
 use usb_device::{class_prelude::*, prelude::*};
 use usbd_serial::SerialPort;
-// Provide an alias for our BSP so we can switch targets quickly.
-// Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
-use rp_pico as bsp;
-// use sparkfun_pro_micro_rp2040 as bsp;
 
 use bsp::hal::{
     clocks::{init_clocks_and_plls, Clock},
@@ -25,13 +24,42 @@ use bsp::hal::{
     watchdog::Watchdog,
 };
 
+static mut CORE1_STACK: Stack<4096> = Stack::new();
+
+fn core1_task(sys_freq: u32) -> ! {
+    let mut pac = unsafe { bsp::hal::pac::Peripherals::steal() };
+    let core = unsafe { pac::CorePeripherals::steal() };
+    let sio = bsp::hal::sio::Sio::new(pac.SIO);
+    let mut delay = cortex_m::delay::Delay::new(core.SYST, sys_freq);
+
+    let pins = bsp::Pins::new(
+        pac.IO_BANK0,
+        pac.PADS_BANK0,
+        sio.gpio_bank0,
+        &mut pac.RESETS,
+    );
+
+    let mut led_pin: bsp::hal::gpio::Pin<
+        bsp::hal::gpio::bank0::Gpio25,
+        bsp::hal::gpio::FunctionSio<bsp::hal::gpio::SioOutput>,
+        bsp::hal::gpio::PullDown,
+    > = pins.led.into_push_pull_output();
+    loop {
+        info!("on!");
+        led_pin.set_high().unwrap();
+        delay.delay_ms(500);
+        info!("off!");
+        led_pin.set_low().unwrap();
+        delay.delay_ms(500);
+    }
+}
+
 #[entry]
 fn main() -> ! {
     info!("Program start");
     let mut pac = pac::Peripherals::take().unwrap();
-    let core = pac::CorePeripherals::take().unwrap();
+    // let core = pac::CorePeripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
-    let sio = Sio::new(pac.SIO);
 
     // External high-speed crystal on the pico board is 12Mhz
     let external_xtal_freq_hz = 12_000_000u32;
@@ -47,15 +75,8 @@ fn main() -> ! {
     .ok()
     .unwrap();
 
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
     let timer = bsp::hal::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
 
-    let pins = bsp::Pins::new(
-        pac.IO_BANK0,
-        pac.PADS_BANK0,
-        sio.gpio_bank0,
-        &mut pac.RESETS,
-    );
     let usb_bus = UsbBusAllocator::new(bsp::hal::usb::UsbBus::new(
         pac.USBCTRL_REGS,
         pac.USBCTRL_DPRAM,
@@ -63,7 +84,6 @@ fn main() -> ! {
         true,
         &mut pac.RESETS,
     ));
-    let mut led_pin = pins.led.into_push_pull_output();
     // Set up the USB Communications Class Device driver
     let mut serial = SerialPort::new(&usb_bus);
 
@@ -76,7 +96,17 @@ fn main() -> ! {
         .build();
 
     let mut said_hello: bool = false;
-    let mut toogle = false;
+
+    let sys_freq = clocks.system_clock.freq().to_Hz();
+
+    let mut sio = bsp::hal::sio::Sio::new(pac.SIO);
+
+    let mut mc = Multicore::new(&mut pac.PSM, &mut pac.PPB, &mut sio.fifo);
+    let cores = mc.cores();
+    let core1 = &mut cores[1];
+    let _temp = core1.spawn(unsafe { &mut CORE1_STACK.mem }, move || {
+        core1_task(sys_freq)
+    });
 
     loop {
         // A welcome message at the beginning
@@ -112,12 +142,6 @@ fn main() -> ! {
                     // Send back to the host
                     let mut wr_ptr = &buf[..count];
 
-                    if toogle == false {
-                        led_pin.set_high().unwrap();
-                    } else {
-                        led_pin.set_low().unwrap();
-                    }
-                    toogle = !toogle;
                     while !wr_ptr.is_empty() {
                         match serial.write(wr_ptr) {
                             Ok(len) => wr_ptr = &wr_ptr[len..],
@@ -130,12 +154,6 @@ fn main() -> ! {
                 }
             }
         }
-        // info!("on!");
-        // led_pin.set_high().unwrap();
-        // delay.delay_ms(500);
-        // info!("off!");
-        // led_pin.set_low().unwrap();
-        // delay.delay_ms(500);
     }
 }
 
