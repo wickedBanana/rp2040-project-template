@@ -7,16 +7,20 @@
             "type": "cortex-debug",
             "cwd": "${workspaceRoot}",
             "executable": "${workspaceFolder}/target/thumbv6m-none-eabi/debug/rp2040-project-template",
-            "preLaunchTask": "start openocd",
-            "servertype": "external",
+            // "preLaunchTask": "start openocd",
+            "servertype": "openocd",
             // This may need to be gdb-multiarch depending on your system (i.e. Linux vs Mac)
             "gdbPath": "arm-none-eabi-gdb",
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "target/rp2040.cfg"
+            ],
             // Connect to an already running OpenOCD instance
-            "gdbTarget": "localhost:4444",
+            // "gdbTarget": "localhost:4444",
             // If you have the Pico SDK installed, allows the
             // display of the RP2040 CPU registers in VS Code
             "svdFile": "${env:PICO_SDK_PATH}/src/rp2040/hardware_regs/rp2040.svd",
-            "runToMain": true,
+            "runToEntryPoint": "main",
             "preLaunchCommands": [
                 "monitor init",
                 "monitor reset init",
