@@ -10,7 +10,6 @@ use core::fmt::Write;
 use defmt::*;
 use defmt_rtt as _;
 use embedded_hal::digital::v2::OutputPin;
-// use embedded_hal::digital::StatefulOutputPin;
 use heapless::String;
 use panic_probe as _;
 use rp_pico as bsp;
@@ -29,7 +28,7 @@ static mut CORE1_STACK: Stack<4096> = Stack::new();
 fn core1_task(sys_freq: u32) -> ! {
     let mut pac = unsafe { bsp::hal::pac::Peripherals::steal() };
     let core = unsafe { pac::CorePeripherals::steal() };
-    let sio = bsp::hal::sio::Sio::new(pac.SIO);
+    let sio = Sio::new(pac.SIO);
     let mut delay = cortex_m::delay::Delay::new(core.SYST, sys_freq);
 
     let pins = bsp::Pins::new(
@@ -84,10 +83,9 @@ fn main() -> ! {
         true,
         &mut pac.RESETS,
     ));
-    // Set up the USB Communications Class Device driver
+
     let mut serial = SerialPort::new(&usb_bus);
 
-    // Create a USB device with a fake VID and PID
     let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
         .manufacturer("Fake company")
         .product("Serial port")
@@ -99,7 +97,7 @@ fn main() -> ! {
 
     let sys_freq = clocks.system_clock.freq().to_Hz();
 
-    let mut sio = bsp::hal::sio::Sio::new(pac.SIO);
+    let mut sio = Sio::new(pac.SIO);
 
     let mut mc = Multicore::new(&mut pac.PSM, &mut pac.PPB, &mut sio.fifo);
     let cores = mc.cores();
