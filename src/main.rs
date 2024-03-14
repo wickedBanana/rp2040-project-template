@@ -6,7 +6,8 @@
 
 use bsp::entry;
 use bsp::hal::multicore::{Multicore, Stack};
-use core::fmt::Write;
+// use bsp::hal::sio::SioFifo;
+// use core::fmt::Write;
 use defmt::*;
 use defmt_rtt as _;
 use embedded_hal::digital::v2::OutputPin;
@@ -28,7 +29,7 @@ static mut CORE1_STACK: Stack<4096> = Stack::new();
 fn core1_task(sys_freq: u32) -> ! {
     let mut pac = unsafe { bsp::hal::pac::Peripherals::steal() };
     let core = unsafe { pac::CorePeripherals::steal() };
-    let sio = Sio::new(pac.SIO);
+    let mut sio = Sio::new(pac.SIO);
     let mut delay = cortex_m::delay::Delay::new(core.SYST, sys_freq);
 
     let pins = bsp::Pins::new(
@@ -43,13 +44,23 @@ fn core1_task(sys_freq: u32) -> ! {
         bsp::hal::gpio::FunctionSio<bsp::hal::gpio::SioOutput>,
         bsp::hal::gpio::PullDown,
     > = pins.led.into_push_pull_output();
+
+    let mut delay_duration: u32 = 500;
+
     loop {
+        let input = sio.fifo.read();
+
+        match input {
+            Some(x) => delay_duration = x,
+            _ => (),
+        }
+
         info!("on!");
         led_pin.set_high().unwrap();
-        delay.delay_ms(500);
+        delay.delay_ms(delay_duration);
         info!("off!");
         led_pin.set_low().unwrap();
-        delay.delay_ms(500);
+        delay.delay_ms(delay_duration);
     }
 }
 
@@ -57,7 +68,6 @@ fn core1_task(sys_freq: u32) -> ! {
 fn main() -> ! {
     info!("Program start");
     let mut pac = pac::Peripherals::take().unwrap();
-    // let core = pac::CorePeripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
 
     // External high-speed crystal on the pico board is 12Mhz
@@ -74,7 +84,7 @@ fn main() -> ! {
     .ok()
     .unwrap();
 
-    let timer = bsp::hal::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
+    // let timer = bsp::hal::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
 
     let usb_bus = UsbBusAllocator::new(bsp::hal::usb::UsbBus::new(
         pac.USBCTRL_REGS,
@@ -93,7 +103,7 @@ fn main() -> ! {
         .device_class(2) // from: https://www.usb.org/defined-class-codes
         .build();
 
-    let mut said_hello: bool = false;
+    // let mut said_hello: bool = false;
 
     let sys_freq = clocks.system_clock.freq().to_Hz();
 
@@ -107,21 +117,16 @@ fn main() -> ! {
     });
 
     loop {
-        // A welcome message at the beginning
-        if !said_hello && timer.get_counter().ticks() >= 2_000_000 {
-            said_hello = true;
-            let _ = serial.write(b"Hello, World!\r\n");
+        // if !said_hello && timer.get_counter().ticks() >= 2_000_000 {
+        //     said_hello = true;
+        //     let _ = serial.write(b"Hello, World!\r\n");
 
-            let time = timer.get_counter().ticks();
-            let mut text: String<64> = String::new();
-            writeln!(&mut text, "Current timer ticks: {}", time).unwrap();
+        //     let time = timer.get_counter().ticks();
+        //     let mut text: String<64> = String::new();
+        //     writeln!(&mut text, "Current timer ticks: {}", time).unwrap();
 
-            // This only works reliably because the number of bytes written to
-            // the serial port is smaller than the buffers available to the USB
-            // peripheral. In general, the return value should be handled, so that
-            // bytes not transferred yet don't get lost.
-            let _ = serial.write(text.as_bytes());
-        }
+        //     let _ = serial.write(text.as_bytes());
+        // }
 
         if usb_dev.poll(&mut [&mut serial]) {
             let mut buf = [0u8; 64];
@@ -134,9 +139,11 @@ fn main() -> ! {
                 }
                 Ok(count) => {
                     // Convert to upper case
-                    buf.iter_mut().take(count).for_each(|b| {
-                        b.make_ascii_uppercase();
-                    });
+                    // buf.iter_mut().take(count).for_each(|b| {
+                    //     b.make_ascii_uppercase();
+                    // });
+
+                    let _temp = String::from_iter(Vec::from_iter(buf.iter()));
                     // Send back to the host
                     let mut wr_ptr = &buf[..count];
 
