@@ -3,15 +3,15 @@
 //! This will blink an LED attached to GP25, which is the pin the Pico uses for the on-board LED.
 #![no_std]
 #![no_main]
-
 use bsp::entry;
 use bsp::hal::multicore::{Multicore, Stack};
+// use bsp::hal::rom_data::reset_to_usb_boot;
+// use bsp::pac::adc::result;
 // use bsp::hal::sio::SioFifo;
 // use core::fmt::Write;
 use defmt::*;
 use defmt_rtt as _;
 use embedded_hal::digital::v2::OutputPin;
-use heapless::String;
 use panic_probe as _;
 use rp_pico as bsp;
 use usb_device::{class_prelude::*, prelude::*};
@@ -112,47 +112,36 @@ fn main() -> ! {
     let mut mc = Multicore::new(&mut pac.PSM, &mut pac.PPB, &mut sio.fifo);
     let cores = mc.cores();
     let core1 = &mut cores[1];
-    let _temp = core1.spawn(unsafe { &mut CORE1_STACK.mem }, move || {
+    let _ = core1.spawn(unsafe { &mut CORE1_STACK.mem }, move || {
         core1_task(sys_freq)
     });
 
     loop {
-        // if !said_hello && timer.get_counter().ticks() >= 2_000_000 {
-        //     said_hello = true;
-        //     let _ = serial.write(b"Hello, World!\r\n");
-
-        //     let time = timer.get_counter().ticks();
-        //     let mut text: String<64> = String::new();
-        //     writeln!(&mut text, "Current timer ticks: {}", time).unwrap();
-
-        //     let _ = serial.write(text.as_bytes());
-        // }
-
         if usb_dev.poll(&mut [&mut serial]) {
             let mut buf = [0u8; 64];
             match serial.read(&mut buf) {
-                Err(_e) => {
-                    // Do nothing
-                }
-                Ok(0) => {
-                    // Do nothing
-                }
+                Err(_e) => {}
+                Ok(0) => {}
                 Ok(count) => {
-                    // Convert to upper case
-                    // buf.iter_mut().take(count).for_each(|b| {
-                    //     b.make_ascii_uppercase();
-                    // });
+                    let mut i: u32 = 0;
+                    let mut result: u32 = 0;
 
-                    let _temp = String::from_iter(Vec::from_iter(buf.iter()));
-                    // Send back to the host
+                    while i < count as u32 {
+                        result = result
+                            + (buf[i as usize] - 0x30) as u32
+                                * u32::pow(10, (count as u32 - 1) - i);
+                        i = i + 1;
+                    }
+
+                    if sio.fifo.is_write_ready() {
+                        sio.fifo.write(result);
+                    }
+
                     let mut wr_ptr = &buf[..count];
 
                     while !wr_ptr.is_empty() {
                         match serial.write(wr_ptr) {
                             Ok(len) => wr_ptr = &wr_ptr[len..],
-                            // On error, just drop unwritten data.
-                            // One possible error is Err(WouldBlock), meaning the USB
-                            // write buffer is full.
                             Err(_) => break,
                         };
                     }
@@ -161,5 +150,3 @@ fn main() -> ! {
         }
     }
 }
-
-// End of file
