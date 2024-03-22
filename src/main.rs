@@ -48,12 +48,16 @@ fn core1_task(sys_freq: u32) -> ! {
     let mut delay_duration: u32 = 500;
 
     loop {
-        let input = sio.fifo.read();
-
-        match input {
-            Some(x) => delay_duration = x,
-            _ => (),
+        if sio.fifo.is_read_ready() {
+            delay_duration = sio.fifo.read().unwrap();
         }
+
+        // let input = sio.fifo.read();
+
+        // match input {
+        //     Some(x) => delay_duration = x,
+        //     _ => (),
+        // }
 
         info!("on!");
         led_pin.set_high().unwrap();
@@ -84,8 +88,6 @@ fn main() -> ! {
     .ok()
     .unwrap();
 
-    // let timer = bsp::hal::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
-
     let usb_bus = UsbBusAllocator::new(bsp::hal::usb::UsbBus::new(
         pac.USBCTRL_REGS,
         pac.USBCTRL_DPRAM,
@@ -102,8 +104,6 @@ fn main() -> ! {
         .serial_number("TEST")
         .device_class(2) // from: https://www.usb.org/defined-class-codes
         .build();
-
-    // let mut said_hello: bool = false;
 
     let sys_freq = clocks.system_clock.freq().to_Hz();
 
@@ -127,6 +127,11 @@ fn main() -> ! {
                     let mut result: u32 = 0;
 
                     while i < count as u32 {
+                        if buf[i as usize] < 0x30 || buf[i as usize] > 0x39 {
+                            result = 500;
+                            break;
+                        }
+
                         result = result
                             + (buf[i as usize] - 0x30) as u32
                                 * u32::pow(10, (count as u32 - 1) - i);
