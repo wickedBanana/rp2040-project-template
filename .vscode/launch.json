@@ -7,7 +7,6 @@
             "type": "cortex-debug",
             "cwd": "${workspaceRoot}",
             "executable": "${workspaceFolder}/target/thumbv6m-none-eabi/debug/rp2040-project-template",
-            // "preLaunchTask": "start openocd",
             "servertype": "openocd",
             "gdbPath": "arm-none-eabi-gdb",
             "configFiles": [

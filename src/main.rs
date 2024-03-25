@@ -1,6 +1,3 @@
-//! Blinks the LED on a Pico board
-//!
-//! This will blink an LED attached to GP25, which is the pin the Pico uses for the on-board LED.
 #![no_std]
 #![no_main]
 use bsp::entry;
@@ -65,7 +62,6 @@ fn main() -> ! {
     let mut pac = pac::Peripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
 
-    // External high-speed crystal on the pico board is 12Mhz
     let external_xtal_freq_hz = 12_000_000u32;
     let clocks = init_clocks_and_plls(
         external_xtal_freq_hz,
@@ -119,6 +115,7 @@ fn main() -> ! {
                     let mut result: u32 = 0;
                     while i < count as u32 {
                         if buf[i as usize] < 0x30 || buf[i as usize] > 0x39 {
+                            debug!("Bad char received: {}", buf[i as usize] as char);
                             result = 500;
                             break;
                         }
