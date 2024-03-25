@@ -52,17 +52,8 @@ fn core1_task(sys_freq: u32) -> ! {
             delay_duration = sio.fifo.read().unwrap();
         }
 
-        // let input = sio.fifo.read();
-
-        // match input {
-        //     Some(x) => delay_duration = x,
-        //     _ => (),
-        // }
-
-        info!("on!");
         led_pin.set_high().unwrap();
         delay.delay_ms(delay_duration);
-        info!("off!");
         led_pin.set_low().unwrap();
         delay.delay_ms(delay_duration);
     }
@@ -123,9 +114,9 @@ fn main() -> ! {
                 Err(_e) => {}
                 Ok(0) => {}
                 Ok(count) => {
+                    debug!("Data received");
                     let mut i: u32 = 0;
                     let mut result: u32 = 0;
-
                     while i < count as u32 {
                         if buf[i as usize] < 0x30 || buf[i as usize] > 0x39 {
                             result = 500;

@@ -14,15 +14,14 @@
                 "interface/cmsis-dap.cfg",
                 "target/rp2040.cfg"
             ],
-            // "gdbTarget": "localhost:4444",
             "svdFile": "${env:PICO_SDK_PATH}/src/rp2040/hardware_regs/rp2040.svd",
             "runToEntryPoint": "main",
             "preLaunchCommands": [
                 "monitor init",
                 "monitor reset init",
                 "monitor halt",
+                "monitor rp2040.core1 arp_reset assert 0 ; rp2040.core0 arp_reset assert 0 ; reset halt",
             ],
-            // Work around for stopping at main on restart
             "postRestartCommands": [
                 "break main",
                 "continue"
