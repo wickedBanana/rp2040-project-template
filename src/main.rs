@@ -8,6 +8,7 @@ use bsp::hal::multicore::{Multicore, Stack};
 // use core::fmt::Write;
 use defmt::*;
 use defmt_rtt as _;
+use embedded_hal::adc::OneShot;
 use embedded_hal::digital::v2::OutputPin;
 use panic_probe as _;
 use rp_pico as bsp;
@@ -15,6 +16,7 @@ use usb_device::{class_prelude::*, prelude::*};
 use usbd_serial::SerialPort;
 
 use bsp::hal::{
+    adc::Adc,
     clocks::{init_clocks_and_plls, Clock},
     pac,
     sio::Sio,
@@ -23,12 +25,21 @@ use bsp::hal::{
 
 static mut CORE1_STACK: Stack<4096> = Stack::new();
 
+fn calc_temp(adc_counts: u16) -> u16 {
+    let voltage: u16 = adc_counts * (3300 / 4096);
+    info!("voltage {} adc_counts {}", voltage, adc_counts);
+    let result = 27 as f32 - (voltage as i16 - 706) as f32 / 1.721;
+    // 10
+    result as u16
+}
+
 fn core1_task(sys_freq: u32) -> ! {
+    info!("Core 1 start");
     let mut pac = unsafe { bsp::hal::pac::Peripherals::steal() };
     let core = unsafe { pac::CorePeripherals::steal() };
     let mut sio = Sio::new(pac.SIO);
     let mut delay = cortex_m::delay::Delay::new(core.SYST, sys_freq);
-
+git
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
         pac.PADS_BANK0,
@@ -42,6 +53,8 @@ fn core1_task(sys_freq: u32) -> ! {
         bsp::hal::gpio::PullDown,
     > = pins.led.into_push_pull_output();
 
+    let mut adc = Adc::new(pac.ADC, &mut pac.RESETS);
+    let mut temperature_sensor = adc.take_temp_sensor().unwrap();
     let mut delay_duration: u32 = 500;
 
     loop {
@@ -53,12 +66,14 @@ fn core1_task(sys_freq: u32) -> ! {
         delay.delay_ms(delay_duration);
         led_pin.set_low().unwrap();
         delay.delay_ms(delay_duration);
+        let temperature = calc_temp(adc.read(&mut temperature_sensor).unwrap());
+        info!("Temperature {}", temperature);
     }
 }
 
 #[entry]
 fn main() -> ! {
-    info!("Program start");
+    info!("Core 0 start");
     let mut pac = pac::Peripherals::take().unwrap();
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
 
