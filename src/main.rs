@@ -25,12 +25,12 @@ use bsp::hal::{
 
 static mut CORE1_STACK: Stack<4096> = Stack::new();
 
-fn calc_temp(adc_counts: u16) -> u16 {
-    let voltage: u16 = adc_counts * (3300 / 4096);
+fn calc_temp(adc_counts: u16) -> f32 {
+    let voltage: f32 = adc_counts as f32 * (3300f32 / 4096f32);
     info!("voltage {} adc_counts {}", voltage, adc_counts);
     let result = 27 as f32 - (voltage as i16 - 706) as f32 / 1.721;
-    // 10
-    result as u16
+
+    result
 }
 
 fn core1_task(sys_freq: u32) -> ! {
@@ -39,7 +39,7 @@ fn core1_task(sys_freq: u32) -> ! {
     let core = unsafe { pac::CorePeripherals::steal() };
     let mut sio = Sio::new(pac.SIO);
     let mut delay = cortex_m::delay::Delay::new(core.SYST, sys_freq);
-git
+
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
         pac.PADS_BANK0,
@@ -67,6 +67,9 @@ git
         led_pin.set_low().unwrap();
         delay.delay_ms(delay_duration);
         let temperature = calc_temp(adc.read(&mut temperature_sensor).unwrap());
+        if sio.fifo.is_write_ready() {
+            sio.fifo.write(temperature.to_bits())
+        }
         info!("Temperature {}", temperature);
     }
 }
@@ -119,6 +122,13 @@ fn main() -> ! {
     });
 
     loop {
+        let temperature: u32;
+
+        if sio.fifo.is_read_ready() {
+            temperature = sio.fifo.read().unwrap();
+            info!("Temperature from fifo 1: {}", f32::from_bits(temperature));
+        }
+
         if usb_dev.poll(&mut [&mut serial]) {
             let mut buf = [0u8; 64];
             match serial.read(&mut buf) {
