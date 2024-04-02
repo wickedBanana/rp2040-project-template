@@ -2,10 +2,6 @@
 #![no_main]
 use bsp::entry;
 use bsp::hal::multicore::{Multicore, Stack};
-// use bsp::hal::rom_data::reset_to_usb_boot;
-// use bsp::pac::adc::result;
-// use bsp::hal::sio::SioFifo;
-// use core::fmt::Write;
 use defmt::*;
 use defmt_rtt as _;
 use embedded_hal::adc::OneShot;
