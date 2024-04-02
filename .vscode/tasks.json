@@ -1,0 +1,28 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "cargo",
+            "args": [
+                "build"
+            ],
+        },
+        {
+            "label": "start openocd",
+            "type": "shell",
+            "command": "openocd -f interface/cmsis-dap.cfg -f target/rp2040.cfg -c 'adapter speed 5000'",
+        },
+        {
+            "label": "stat debug task",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "build",
+                "start openocd"
+            ],
+        }
+    ]
+}
