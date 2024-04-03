@@ -151,7 +151,8 @@ fn main() -> ! {
                         sio.fifo.write(result);
                     }
 
-                    let mut wr_ptr = &buf[..count];
+                    buf[count] = '\n' as u8;
+                    let mut wr_ptr = &buf[..count + 1];
 
                     while !wr_ptr.is_empty() {
                         match serial.write(wr_ptr) {
