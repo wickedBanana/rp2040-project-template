@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+use crate::pac::io_bank0::gpio::gpio_ctrl::FUNCSEL_A::PIO0;
 use bsp::entry;
 use bsp::hal::multicore::{Multicore, Stack};
 use defmt::*;
@@ -10,6 +11,7 @@ use panic_probe as _;
 use rp_pico as bsp;
 use usb_device::{class_prelude::*, prelude::*};
 use usbd_serial::SerialPort;
+use ws2812_pio;
 
 use bsp::hal::{
     adc::Adc,
@@ -23,7 +25,7 @@ static mut CORE1_STACK: Stack<4096> = Stack::new();
 
 fn calc_temp(adc_counts: u16) -> f32 {
     let voltage: f32 = adc_counts as f32 * (3300f32 / 4096f32);
-    info!("voltage {} adc_counts {}", voltage, adc_counts);
+    info!("{}voltage {} adc_counts", voltage, adc_counts);
     let result = 27 as f32 - (voltage as i16 - 706) as f32 / 1.721;
 
     result
@@ -116,6 +118,8 @@ fn main() -> ! {
     let _ = core1.spawn(unsafe { &mut CORE1_STACK.mem }, move || {
         core1_task(sys_freq)
     });
+
+    let (mut pio, sm0, _, _, _) = bsp::hal::pac::pio(&mut pac.RESETS);
 
     loop {
         let temperature: u32;
